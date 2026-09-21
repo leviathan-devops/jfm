@@ -10,14 +10,17 @@ const R = new URL("..", import.meta.url).pathname;
 const PROJECT = "jarvis-upper";
 const LIVE = "jarvis-upper-2";
 const DEAD = "jarvis-upper-does-not-exist-999";
+// test isolation: unique paths per run (a persisted file made the first case flaky)
+const PROBE_SPEC = `/tmp/jfm-probe-spec-${process.pid}.md`;
+const MISSING_SPEC = `/tmp/jfm-missing-spec-${process.pid}.md`;
 
 test("jfm_verbs: ADVERSARIAL — a bad harness is REFUSED with the token named", async () => {
-  const r = await VERBS.dispatch(R, ["--project", PROJECT, "--desk", "jfm-bad-harness", "--job", "/tmp/jfm-probe-spec.md", "--harness", "NOT_A_HARNESS"]);
+  const r = await VERBS.dispatch(R, ["--project", PROJECT, "--desk", "jfm-bad-harness", "--job", `${MISSING_SPEC}`, "--harness", "NOT_A_HARNESS"]);
   expect(r.code).toBe(2);
   expect(String(r.out.refused)).toContain("JOB-UNREADABLE");
   // with a real spec, the harness refusal must come from AO and carry the token
-  await Bun.write("/tmp/jfm-probe-spec.md", "# probe job\nfor the harness-refusal check\n");
-  const r2 = await VERBS.dispatch(R, ["--project", PROJECT, "--desk", "jfm-bad-harness", "--job", "/tmp/jfm-probe-spec.md", "--harness", "NOT_A_HARNESS"]);
+  await Bun.write(PROBE_SPEC, "# probe job\nfor the harness-refusal check\n");
+  const r2 = await VERBS.dispatch(R, ["--project", PROJECT, "--desk", "jfm-bad-harness", "--job", `${PROBE_SPEC}`, "--harness", "NOT_A_HARNESS"]);
   expect(r2.code).toBe(1);
   expect(String(r2.out.error)).toContain("AO_HARNESS_UNKNOWN");
 });

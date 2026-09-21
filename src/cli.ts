@@ -4,6 +4,7 @@ import { aoTransport, health, listPanes, prList, prMerge, sessionRow, copilotKey
 import { assertPin } from "./pin";
 import { watchDeskAo, listWorktrees } from "./watch-ao";
 import { gateDesk } from "./gate";
+import { insertDeskRow, listDesks, setDeskState } from "./desk";
 
 export interface VerbResult { code: number; out: Record<string, unknown> }
 const emit = (code: number, out: Record<string, unknown>): VerbResult => ({ code, out });
@@ -48,7 +49,13 @@ export async function verbDispatch(_root: string, argv: string[]): Promise<VerbR
   if (!spec.trim()) return emit(2, { ok: false, refused: `JOB-UNREADABLE:${job}` });
   try {
     const pane = await aoTransport.spawnTile({ session: project, name: desk, prompt: spec, harness: arg("harness", argv) ?? "omp", mode: "tui" });
-    return emit(0, { ok: true, desk, sessionId: pane.pane_id, project, worktree: `${process.env.HOME}/.ao/data/worktrees/${project}/${pane.pane_id}`, copilotKey: copilotKey(desk, pane.pane_id) });
+    const scope = arg("scope", argv) ?? "/home/leviathan/JARVIS_WORKSPACE/jarvis-upper";
+    const wave = arg("wave", argv) ?? "w0";
+    const branch = `ao/${pane.pane_id}/root`;
+    insertDeskRow(scope, { desk, wave, sessionId: pane.pane_id, project, job, branch });
+    return emit(0, { ok: true, desk, wave, sessionId: pane.pane_id, project, branch,
+      worktree: `${process.env.HOME}/.ao/data/worktrees/${project}/${pane.pane_id}`,
+      copilotKey: copilotKey(desk, pane.pane_id) });
   } catch (e) { return emit(1, { ok: false, error: String(e).slice(0, 160) }); }
 }
 
@@ -93,13 +100,39 @@ export async function verbBoard(_root: string, argv: string[]): Promise<VerbResu
   return emit(0, { ok: true, project, sessions: panes.length, panes, worktrees: wts });
 }
 
+export async function verbWave(_root: string, argv: string[]): Promise<VerbResult> {
+  const wave = arg("wave", argv);
+  const scope = arg("scope", argv) ?? "/home/leviathan/JARVIS_WORKSPACE/jarvis-upper";
+  const rows = listDesks(scope, wave);
+  if (rows.length === 0) return emit(1, { ok: false, wave: wave ?? "*", desks: [], unverdicted: [], reason: "NO-DESKS" });
+  const desks: Record<string, unknown>[] = [];
+  const unverdicted: string[] = [];
+  for (const r of rows) {
+    const entry: Record<string, unknown> = { desk: r.desk, session: r.session_id, state: r.state };
+    if (r.session_id) {
+      const w = await watchDeskAo(r.desk, r.session_id, r.project ?? "");
+      entry.watch = w.verdict;
+    }
+    if (r.ao_job && r.ao_head) {
+      const g = await gateDesk({ jobDir: r.ao_job, headSha: r.ao_head, sessionId: r.session_id });
+      entry.gate = g.verdict;
+      entry.reasons = g.reasons;
+      if (g.verdict === "VERIFIED") setDeskState(scope, r.desk, "complete", { ao_head: r.ao_head });
+      else unverdicted.push(r.desk);
+    } else unverdicted.push(r.desk);
+    desks.push(entry);
+  }
+  const ok = unverdicted.length === 0;
+  return emit(ok ? 0 : 1, { ok, wave: wave ?? "*", desks, unverdicted });
+}
+
 export const VERBS: Record<string, (root: string, argv: string[]) => Promise<VerbResult>> = {
   health: verbHealth, status: verbStatus, watch: verbWatch, pin: verbPin,
   dispatch: verbDispatch, steer: verbSteer, abort: verbAbort, pr: verbPr,
-  gate: verbGate, board: verbBoard,
+  gate: verbGate, board: verbBoard, wave: verbWave,
 };
 
-const usage = `usage: jfm <health|status|watch|pin|dispatch|steer|abort|pr|gate|board> [--flags]
+const usage = `usage: jfm <health|status|watch|pin|dispatch|steer|abort|pr|gate|board|wave> [--flags]
   dispatch  --project <p> --desk <d> --job <spec.md> [--harness omp]
   watch     --session <id> [--project <p>] [--desk <d>]
   status    --session <id>
@@ -108,7 +141,8 @@ const usage = `usage: jfm <health|status|watch|pin|dispatch|steer|abort|pr|gate|
   pin       --project <id> [--overlay <path>]
   gate      --job <dir> --sha <head> --session <id>
   pr        --session <id> [--merge <prId> --confirm]
-  board     [--project <p>]`;
+  board     [--project <p>]
+  wave      --wave <w> [--scope <repo>]   → the desk table + UNVERDICTED:`;
 
 if (import.meta.main) {
   const argv = Bun.argv.slice(2);
