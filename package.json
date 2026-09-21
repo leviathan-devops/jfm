@@ -1,0 +1,16 @@
+{
+  "name": "jfm",
+  "version": "0.1.0",
+  "description": "JFM — the Jarvis Factory Manager: the desk CLI for the AO substrate (the JAM-for-AO)",
+  "type": "module",
+  "bin": {
+    "jfm": "./src/cli.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "jfm": "bun src/cli.ts"
+  },
+  "devDependencies": {
+    "bun-types": "^1.4.2"
+  }
+}
