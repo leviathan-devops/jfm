@@ -9,7 +9,10 @@ export interface PinState {
   problems: string[];
 }
 
-const OVERLAY = "/home/leviathan/JARVIS_WORKSPACE/jarvis-upper/.omp/config.yml";
+// The upper-tier overlay, resolved from THIS module's location so a move of the
+// factory tree cannot break it (the hardcoded path did, on 2026-09-22).
+const UPPER_ROOT = new URL("../../jarvis-upper", import.meta.url).pathname.replace(/\/$/, "");
+const OVERLAY = `${UPPER_ROOT}/.omp/config.yml`;
 const REQUIRED_ENV = ["OMP_PROFILE"];
 
 export async function readProjectEnv(projectId: string): Promise<Record<string, string>> {

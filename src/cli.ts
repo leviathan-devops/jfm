@@ -5,6 +5,7 @@ import { assertPin } from "./pin";
 import { watchDeskAo, listWorktrees } from "./watch-ao";
 import { gateDesk } from "./gate";
 import { insertDeskRow, listDesks, setDeskState } from "./desk";
+const UPPER_ROOT = new URL("../../jarvis-upper", import.meta.url).pathname.replace(/\/$/, "");
 
 export interface VerbResult { code: number; out: Record<string, unknown> }
 const emit = (code: number, out: Record<string, unknown>): VerbResult => ({ code, out });
@@ -49,7 +50,7 @@ export async function verbDispatch(_root: string, argv: string[]): Promise<VerbR
   if (!spec.trim()) return emit(2, { ok: false, refused: `JOB-UNREADABLE:${job}` });
   try {
     const pane = await aoTransport.spawnTile({ session: project, name: desk, prompt: spec, harness: arg("harness", argv) ?? "omp", mode: "tui" });
-    const scope = arg("scope", argv) ?? "/home/leviathan/JARVIS_WORKSPACE/jarvis-upper";
+    const scope = arg("scope", argv) ?? UPPER_ROOT;
     const wave = arg("wave", argv) ?? "w0";
     const branch = `ao/${pane.pane_id}/root`;
     insertDeskRow(scope, { desk, wave, sessionId: pane.pane_id, project, job, branch });
@@ -102,7 +103,7 @@ export async function verbBoard(_root: string, argv: string[]): Promise<VerbResu
 
 export async function verbWave(_root: string, argv: string[]): Promise<VerbResult> {
   const wave = arg("wave", argv);
-  const scope = arg("scope", argv) ?? "/home/leviathan/JARVIS_WORKSPACE/jarvis-upper";
+  const scope = arg("scope", argv) ?? UPPER_ROOT;
   const rows = listDesks(scope, wave);
   if (rows.length === 0) return emit(1, { ok: false, wave: wave ?? "*", desks: [], unverdicted: [], reason: "NO-DESKS" });
   const desks: Record<string, unknown>[] = [];

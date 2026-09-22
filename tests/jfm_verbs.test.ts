@@ -6,6 +6,9 @@ import { test, expect } from "bun:test";
 import { VERBS } from "../src/cli";
 import { aoTransport, health } from "../src/ao-transport";
 
+// Derived from THIS file, so a move of the factory tree cannot break it.
+const UPPER = new URL("../../jarvis-upper", import.meta.url).pathname.replace(/\/$/, "");
+
 const R = new URL("..", import.meta.url).pathname;
 const PROJECT = "jarvis-upper";
 const LIVE = "jarvis-upper-2";
@@ -73,7 +76,7 @@ test("jfm_verbs: pr lists the real PR #1; a merge without --confirm refuses", as
 
 test("jfm_verbs: gate returns UNVERIFIED for the real PR #1 (the two-source law in the CLI)", async () => {
   const sha = "732083e1e7890000000000000000000000000000";
-  const r = await VERBS.gate(R, ["--job", "/home/leviathan/JARVIS_WORKSPACE/jarvis-upper/jobs/upper-tier-dt-shapes", "--sha", sha, "--session", LIVE]);
+  const r = await VERBS.gate(R, ["--job", `${UPPER}/jobs/upper-tier-dt-shapes`, "--sha", sha, "--session", LIVE]);
   expect(r.code).toBe(1);
   expect(String(r.out.verdict)).toBe("UNVERIFIED");
   const reasons = r.out.reasons as string[];
