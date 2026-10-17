@@ -1,6 +1,8 @@
 // pin.ts — resolve + assert the worker pin (JFM blueprint L4: the pin rides the
 // dispatch, never a desk-local .omp/config.yml — EN-019 proved that invisible).
-import { AO_DAEMON } from "./ao-transport";
+import { readFileSync } from "node:fs";
+import { aoDaemon } from "./ao-transport";
+import { assertFetchAllowed } from "./port-guard";
 
 export interface PinState {
   ok: boolean;
@@ -16,7 +18,9 @@ const OVERLAY = `${UPPER_ROOT}/.omp/config.yml`;
 const REQUIRED_ENV = ["OMP_PROFILE"];
 
 export async function readProjectEnv(projectId: string): Promise<Record<string, string>> {
-  const res = await fetch(`${AO_DAEMON}/api/v1/projects/${projectId}`, { signal: AbortSignal.timeout(6000) });
+  const url = `${aoDaemon()}/api/v1/projects/${projectId}`;
+  assertFetchAllowed(url);
+  const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
   if (!res.ok) throw new Error(`project ${projectId}: HTTP ${res.status}`);
   const d = (await res.json()) as { project: { config?: { env?: Record<string, string> } } };
   return d.project.config?.env ?? {};
@@ -24,11 +28,7 @@ export async function readProjectEnv(projectId: string): Promise<Record<string, 
 
 export function readOverlayRoles(path = OVERLAY): Record<string, string> | null {
   try {
-    const text = Bun.file(path).text();
-    void text;
-  } catch { /* fallthrough */ }
-  try {
-    const raw = require("node:fs").readFileSync(path, "utf8") as string;
+    const raw = readFileSync(path, "utf8");
     const out: Record<string, string> = {};
     const block = raw.split("modelRoles:")[1]?.split("\n") ?? [];
     for (const line of block) {

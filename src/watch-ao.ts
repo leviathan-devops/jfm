@@ -15,8 +15,8 @@ export interface WatchResult {
   reasons: string[];
 }
 
-function worktreePath(projectId: string, sessionId: string): string {
-  return `${process.env.HOME}/.ao/data/worktrees/${projectId}/${sessionId}`;
+function worktreePath(projectId: string, sessionId: string, home: string): string {
+  return `${home}/.ao/data/worktrees/${projectId}/${sessionId}`;
 }
 
 export function gitLog(worktree: string, n = 5): { commits: number; lastAt?: string; lastSubject?: string } {
@@ -29,9 +29,9 @@ export function gitLog(worktree: string, n = 5): { commits: number; lastAt?: str
   } catch { return { commits: 0 }; }
 }
 
-export async function watchDeskAo(desk: string, sessionId: string, projectId: string): Promise<WatchResult> {
+export async function watchDeskAo(desk: string, sessionId: string, projectId: string, home = process.env.HOME ?? ""): Promise<WatchResult> {
   const reasons: string[] = [];
-  const wt = worktreePath(projectId, sessionId);
+  const wt = worktreePath(projectId, sessionId, home);
   let verdict: DeskVerdict = "UNKNOWN";
   const signals: WatchResult["signals"] = { prs: 0 };
 
