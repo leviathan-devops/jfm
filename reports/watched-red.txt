@@ -1,0 +1,37 @@
+Watched-red record for lane/jfm-w1. Commands were run on this clone before the matching fix. No secret values.
+
+1. bun test (whole suite, before the gate change)
+   error: Cannot find module '../../jarvis-upper/src/verdict' from '/workspace/src/gate.ts'
+   0 pass, 1 fail, 1 error. EXIT 1.
+
+2. tests/unit/pin-missing.test.ts (before removing the un-awaited Bun.file read)
+   assertion passed, then the file failed:
+   ENOENT: no such file or directory, open '/tmp/jfm-overlay-missing-....yml'
+   The rejection came from Bun.file().text() on a missing path, which the sync catch cannot see.
+
+3. tests/unit/port-guard.test.ts (withDaemon present, assertFetchAllowed still a no-op)
+   (fail) a forbidden daemon URL is refused and fetch is not called
+   Expected promise that rejects
+   Received promise that resolved
+   (fail) assertFetchAllowed names the port
+   Expected substring: "PORT-FORBIDDEN:8090"
+   Received function did not throw
+   The port-0 mock health test passed once the per-call daemon URL existed.
+   EXIT 1.
+
+4. Planted src/_planted_bad_port.ts containing the text http://127.0.0.1:8090
+   (fail) src hardcodes a forbidden port only inside the guard
+   Expected []
+   Received [ "_planted_bad_port.ts" ]
+   The planted file was deleted and is not in the commit. EXIT 1.
+
+5. bun test tests/jfm_verbs.test.ts after the offline fixes (assertions unchanged)
+   1 pass (dead session → FAILED / SESSION-MISSING on ECONNREFUSED)
+   7 fail:
+   - bad harness: received AO_SPAWN_FAILED ECONNREFUSED, not AO_HARNESS_UNKNOWN
+   - health: substrate down (http=0)
+   - status, pin, pr list: code 1, expected 0
+   - gate: UNVERIFIED but reasons do not start with FENCE- (sibling verdict module absent)
+   - listPanes: ECONNREFUSED http://localhost:3001/api/v1/sessions
+   EXIT 1.
+   These seven stay red. They need live AO and the jarvis-upper sibling, which are not in this repo.

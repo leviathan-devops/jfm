@@ -1,6 +1,6 @@
 // cli.ts — THE JFM OPERATOR SURFACE. One JSON object per verb on stdout;
 // exit 0 ok / 1 negative verdict / 2 refused. The verbs are the vocabulary.
-import { aoTransport, health, listPanes, prList, prMerge, sessionRow, copilotKey, AO_DAEMON } from "./ao-transport";
+import { aoTransport, health, listPanes, prList, prMerge, sessionRow, copilotKey, aoDaemon } from "./ao-transport";
 import { assertPin } from "./pin";
 import { watchDeskAo, listWorktrees } from "./watch-ao";
 import { gateDesk } from "./gate";
@@ -16,8 +16,15 @@ function arg(name: string, argv: string[]): string | undefined {
 }
 
 export async function verbHealth(_root: string, _argv: string[]): Promise<VerbResult> {
-  const code = await health();
-  return emit(code === 200 ? 0 : 1, { ok: code === 200, ao: AO_DAEMON, http: code });
+  const ao = aoDaemon();
+  try {
+    const code = await health();
+    return emit(code === 200 ? 0 : 1, { ok: code === 200, ao, http: code });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.startsWith("PORT-FORBIDDEN")) return emit(2, { ok: false, refused: msg, ao });
+    return emit(1, { ok: false, error: msg.slice(0, 120), ao });
+  }
 }
 
 export async function verbStatus(_root: string, argv: string[]): Promise<VerbResult> {

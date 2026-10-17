@@ -1,6 +1,21 @@
 // ao-transport.ts — THE SEAM. The 10 JAM desk verbs implemented against the AO
 // substrate (REST + SSE) + the AO natives JAM never had (pr list/claim/merge).
 // NOTHING ABOVE THIS FILE MAY KNOW AO EXISTS (JFM blueprint L1).
+import { AsyncLocalStorage } from "node:async_hooks";
+import { assertFetchAllowed } from "./port-guard";
+
+const daemonStore = new AsyncLocalStorage<string>();
+
+/** URL of the AO daemon for this call. Tests bind a private base with withDaemon. */
+export function aoDaemon(): string {
+  return daemonStore.getStore() ?? process.env.AO_DAEMON ?? "http://localhost:3001";
+}
+
+export function withDaemon<T>(url: string, fn: () => T): T {
+  return daemonStore.run(url, fn);
+}
+
+/** Process-start snapshot. Call sites use aoDaemon() so a per-call base wins. */
 export const AO_DAEMON = process.env.AO_DAEMON ?? "http://localhost:3001";
 export const AO_ERR = {
   SPAWN_FAILED: "AO_SPAWN_FAILED",
@@ -35,7 +50,9 @@ export interface AoPr {
 }
 
 async function api<T>(path: string, method = "GET", body?: unknown, timeoutMs = 20000): Promise<T> {
-  const res = await fetch(`${AO_DAEMON}${path}`, {
+  const url = `${aoDaemon()}${path}`;
+  assertFetchAllowed(url);
+  const res = await fetch(url, {
     method,
     headers: { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -99,7 +116,7 @@ export async function createDeskTab(o: SpawnTileOpts): Promise<AoPane> { return 
 export async function listTabs(): Promise<AoPane[]> { return listPanes(); }
 export async function closeDeskTab(paneId: string): Promise<void> { return killPane(paneId); }
 export function copilotKey(desk: string, sessionId?: string): string {
-  const url = sessionId ? `${AO_DAEMON}/sessions/${sessionId}` : `${AO_DAEMON}`;
+  const url = sessionId ? `${aoDaemon()}/sessions/${sessionId}` : `${aoDaemon()}`;
   return `jfm attach --desk ${desk}${sessionId ? ` --session ${sessionId}` : ""}   # kanban: ${url}`;
 }
 
@@ -124,7 +141,9 @@ export async function sessionDiff(sessionId: string): Promise<string> {
   catch { return ""; }
 }
 export async function health(): Promise<number> {
-  try { const res = await fetch(`${AO_DAEMON}/healthz`, { signal: AbortSignal.timeout(4000) }); return res.status; }
+  const url = `${aoDaemon()}/healthz`;
+  assertFetchAllowed(url);
+  try { const res = await fetch(url, { signal: AbortSignal.timeout(4000) }); return res.status; }
   catch { return 0; }
 }
 export const aoTransport = {
